@@ -2,7 +2,6 @@
 
 <!-- HEADER BANNER -->
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner_dark.png">
   <img src="docs/images/banner_light.png" alt="CoheRex-Integrity" width="100%"/>
 </picture>
 
@@ -18,23 +17,27 @@
 
 <br/>
 
-> **CoheRex-Integrity** is a physics-first video forensics engine that detects synthetic temporal tampering — frame deletions, duplications, speed manipulation, clip splicing, and reverse playback — by modeling physical trajectories and human behavior over time rather than relying on pixel-level artifacts. A resilient, architecture-driven approach to video integrity verification.
-
-<br/>
-
 <img src="docs/images/portal_analyzing.png" alt="CoheRex Portal" width="88%" style="border-radius:12px; box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.4);"/>
 
 *The CoheRex Streamlit Portal processing a video for temporal integrity violations.*
 
 </div>
 
+<br/>
+
+> [!IMPORTANT]
+> **CoheRex-Integrity** is a physics-first video forensics engine that detects synthetic temporal tampering — frame deletions, duplications, speed manipulation, clip splicing, and reverse playback — by modeling physical trajectories and human behavior over time rather than relying on pixel-level artifacts. A resilient, architecture-driven approach to video integrity verification.
+
 ---
 
 ## What CoheRex Detects
 
-CoheRex doesn't look at what a frame *looks like* — it looks at whether the **physics of the scene make sense across time**. It flags:
+> [!NOTE]
+> CoheRex doesn't look at what a frame *looks like* — it looks at whether the **physics of the scene make sense across time**.
 
-| Tampering Type | Detection Mechanism |
+It flags:
+
+| 🟥 Tampering Type | 🔬 Detection Mechanism |
 |:---|:---|
 | **Frame Deletion** | Velocity/acceleration discontinuities in tracked trajectories |
 | **Frame Duplication** | Near-zero MCV z-scores sustained over abnormal windows |
@@ -114,6 +117,9 @@ The pipeline traverses six stages — from raw video frames to a signed forensic
 
 Instead of one monolithic tamper detector, CoheRex delegates to three independent agents evaluating orthogonal physical properties simultaneously:
 
+> [!TIP]
+> Each agent can be independently validated, extended, or replaced — the fusion layer absorbs whatever is trustworthy.
+
 ```
                     ┌────────────────────────────────────┐
                     │         FRAME SIGNAL INPUT         │
@@ -137,41 +143,21 @@ Instead of one monolithic tamper detector, CoheRex delegates to three independen
                                   (frame integrity)
 ```
 
-Each agent can be independently validated, extended, or replaced — the fusion layer absorbs whatever is trustworthy.
-
 ---
 
 ### ② Motion Coherence Value (MCV)
 
-The MCV is the core physical signal. It computes rolling z-scores of kinematic features over a sliding window, with a **dynamic noise floor** that prevents false alarms from micro-jitter:
+The MCV is the core physical signal. It computes rolling z-scores of kinematic features over a sliding window, with a **dynamic noise floor** that prevents false alarms from micro-jitter.
 
-```
-           Kinematic Features per Track
-           ┌─────────────────────────────────┐
-           │  · Velocity magnitude           │
-           │  · Acceleration magnitude       │
-           │  · Angular velocity (heading Δ) │
-           └───────────────┬─────────────────┘
-                           │
-                           ▼
-           ┌─────────────────────────────────┐
-           │      Rolling Window (W frames)  │
-           │  μ = mean(feature)              │
-           │  σ = std(feature)               │
-           └───────────────┬─────────────────┘
-                           │
-                           ▼
-           ┌─────────────────────────────────┐
-           │  z = (x - μ) / max(σ, ε)        │
-           │        ↑                        │
-           │    noise floor ε prevents       │
-           │    score explosion from jitter  │
-           └───────────────┬─────────────────┘
-                           │
-                           ▼
-                    MCV z-score
-         (high = physical anomaly = tamper signal)
-```
+The formula guarantees resilience against sub-pixel tracking noise:
+
+$$ z = \frac{x - \mu}{\max(\sigma, \epsilon)} $$
+
+**Where:**
+* $x$ = Current feature value (velocity magnitude, acceleration, or angular velocity)
+* $\mu$ = Rolling mean over window $W$
+* $\sigma$ = Rolling standard deviation over window $W$
+* $\epsilon$ = Dynamic noise floor constraint
 
 ---
 
@@ -179,26 +165,27 @@ The MCV is the core physical signal. It computes rolling z-scores of kinematic f
 
 Agent weights are not static. The fusion engine adjusts them every frame based on how trustworthy each agent is *right now*:
 
-```
-                Effective Weightᵢ = Base Weightᵢ × Reliabilityᵢ
-```
+$$ \text{Effective Weight}_i = \text{Base Weight}_i \times \text{Reliability}_i $$
 
-```
-  Condition                            Reliability Impact
-  ─────────────────────────────────────────────────────────
-  Freshly initialized track            ↓ Motion Agent weight
-  Low-confidence detection (IoU < τ)   ↓ Continuity Agent weight
-  Sparse crowd (<N objects)            ↓ Crowd Agent weight
-  Long-running stable track            ↑ All agent weights
-```
+> [!WARNING]
+> This means unreliable signals are automatically muted rather than polluting the verdict!
 
-This means unreliable signals are automatically muted rather than polluting the verdict.
+**Reliability Condition Mapping:**
+
+| Scenario | Reliability Impact |
+|:---|:---|
+| 🔴 **Freshly initialized track** | $\downarrow$ Motion Agent weight |
+| 🔴 **Low-confidence detection (IoU < $\tau$)** | $\downarrow$ Continuity Agent weight |
+| 🔴 **Sparse crowd (<N objects)** | $\downarrow$ Crowd Agent weight |
+| 🟢 **Long-running stable track** | $\uparrow$ All agent weights |
 
 ---
 
 ### ④ Random Forest Meta-Classifier
 
 The per-frame integrity scores are aggregated into a **global temporal feature vector** which a trained Random Forest classifies:
+
+$$ \mathbf{F} = \Big[ \min(\text{Integrity}), \, \mu(\text{Integrity}), \, \sigma(\text{Integrity}), \, \text{Anomaly Density}, \, \log(\max(\text{MCV})), \, \text{Segment Count} \Big] $$
 
 ```
   Per-frame integrity timeline
@@ -323,6 +310,9 @@ The dashboard runs at `http://localhost:8501` and provides:
 
 ### I. Environment
 
+> [!TIP]
+> Using a pristine virtual environment is strongly recommended to prevent dependency conflicts with other ML frameworks.
+
 ```bash
 # Create and activate a virtual environment
 python -m venv venv
@@ -373,7 +363,8 @@ Navigate to `http://localhost:8501` to begin forensic investigations.
 
 ## Design Philosophy
 
-CoheRex is built on a single core thesis: **tampering breaks physics before it breaks pixels**.
+> [!IMPORTANT]
+> CoheRex is built on a single core thesis: **tampering breaks physics before it breaks pixels**.
 
 Compression artifacts, color grading, and resolution changes can all disguise pixel-level edits — but no post-processing pipeline can reconstruct coherent kinematic trajectories for objects that weren't there, or smooth over the Newtonian impossibilities introduced by frame deletion. By elevating the analysis from the pixel domain to the trajectory domain, CoheRex gains resilience against encoding changes, camera noise, and adversarial compression that defeat traditional forensic approaches.
 
