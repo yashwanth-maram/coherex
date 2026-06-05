@@ -1,0 +1,18 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="coherex",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "opencv-python",
+        "numpy",
+        "pandas",
+        "ultralytics",
+        "filterpy",
+        "scipy",
+        "matplotlib",
+        "loguru",
+        "tqdm",
+    ],
+)

@@ -1,0 +1,22 @@
+# forensic.yaml — CoheRex High-Sensitivity Preset
+#
+# Stricter detection, shorter miss window, wider MCV window,
+# heavier motion weighting in fusion.
+#
+# Usage:
+#   python scripts/run_pipeline.py --video data/raw_videos/sample1.mp4 --config forensic.yaml
+
+detection:
+  confidence_threshold: 0.5
+
+tracking:
+  max_misses: 3
+  tamper_latch_frames: 25
+
+motion:
+  mcv_window_size: 7
+  max_expected_mcv: 4.0
+
+integrity:
+  fusion_weights: [0.5, 0.25, 0.25]
+  segment_window_frames: 200
